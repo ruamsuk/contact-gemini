@@ -1,6 +1,7 @@
 export interface Contact {
   email: string;
-  id?: string; // Optional, will be set by Firestore
+  id?: string; // Firestore, will set optional
+  userId: string;
   name: string;
   phone: string;
 }
