@@ -28,3 +28,6 @@ body {
 }
 
 /* Add your custom styles here */
+button {
+  cursor: pointer;
+}

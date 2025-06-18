@@ -1,6 +1,7 @@
 import { Component, computed, inject, Signal, signal, WritableSignal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { catchError, Observable, tap, throwError } from 'rxjs';
 import { Contact } from '../models/contact.model';
 import { ContactsService } from '../services/contacts.service';
 import { ToastService } from '../services/toast.service';
@@ -9,7 +10,8 @@ import { DialogService } from '../shared/services/dialog';
 @Component({
   selector: 'app-contact-page.component',
   imports: [
-    ReactiveFormsModule
+    ReactiveFormsModule,
+    FormsModule
   ],
   template: `
     <main class="container mx-auto p-4 md:p-8">
@@ -20,9 +22,59 @@ import { DialogService } from '../shared/services/dialog';
           + Add New
         </button>
       </div>
+      <!---->
+      <div class="mb-6 p-4 bg-white rounded-xl shadow-md">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="md:col-span-2">
+            <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Search Contacts</label>
+            <div class="relative">
+              <input
+                type="text"
+                id="search"
+                placeholder="Search by name or email..."
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                [(ngModel)]="searchTerm"
+              >
+              @if (searchTerm()) {
+                <button
+                  (click)="clearSearch()"
+                  class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                  title="Clear search">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                       stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              }
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Sort by Name</label>
+            <div class="flex  gap-2">
+              <button (click)="setSort('asc')"
+                      class="w-full py-2 px-4 rounded-lg text-sm"
+                      [class.bg-blue-600]="sortDirection() === 'asc'"
+                      [class.text-white]="sortDirection() === 'asc'"
+                      [class.bg-gray-200]="sortDirection() !== 'asc'">
+                A-Z ↓
+              </button>
+
+              <button (click)="setSort('desc')"
+                      class="w-full py-2 px-4 rounded-lg text-sm"
+                      [class.bg-blue-600]="sortDirection() === 'desc'"
+                      [class.text-white]="sortDirection() === 'desc'"
+                      [class.bg-gray-200]="sortDirection() !== 'desc'">
+                Z-A ↑
+              </button>
+              <button (click)="setSort('none')" title="Clear sort" class="py-2 px-3 rounded-lg bg-gray-200">✖</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!---->
 
       <div class="space-y-4">
-        @for (contact of contacts(); track contact.id) {
+        @for (contact of filteredContacts(); track contact.id) {
           <div
             class="bg-white p-5 rounded-xl shadow-lg flex items-center justify-between transition-transform hover:scale-105">
             <div class="flex items-center gap-4">
@@ -115,18 +167,71 @@ import { DialogService } from '../shared/services/dialog';
       </div>
     }
   `,
-  styles: ``
+  styles: `.icons {
+    position: relative;
+    right: 30px;
+  }`
 })
 export class ContactPageComponent {
   private contactService = inject(ContactsService);
   private toastService = inject(ToastService);
   private dialogService = inject(DialogService);
   private fb = inject(FormBuilder);
+  loading = signal(false);
 
-  contacts = toSignal(this.contactService.getContacts(), {initialValue: []});
+  /**
+   *  ใช้ toSignal เพื่อแปลง Observable เป็น Signal
+   *  เราจะใช้ tap เพื่อจัดการสถานะ loading
+   *  เราจะใช้ catchError เพื่อจัดการข้อผิดพลาด
+   * */
+  contacts = toSignal(
+    (this.contactService.getContacts() as Observable<Contact[]>)
+      .pipe(
+        tap(() => {
+          this.loading.set(false);
+          console.log('Contacts loaded');
+        }),
+        catchError(err => {
+          this.toastService.show('Error loading contacts: ' + err.message, 'error');
+          console.error('Error loading contacts:', err);
+          return throwError(() => err);
+        })
+      ),
+    {initialValue: []});
+
   selectedContact: WritableSignal<Contact | null> = signal(null);
   isEditing: Signal<boolean> = computed(() => !!this.selectedContact());
   isModalOpen: WritableSignal<boolean> = signal(false);
+
+  // ++ เพิ่ม Signals สำหรับ Search และ Sort ++
+  searchTerm = signal('');
+  sortDirection = signal<'asc' | 'desc' | 'none'>('none');
+
+  // ++ Computed Signal พระเอกของงานนี้ ++
+  // สร้าง signal ใหม่ที่จะคำนวณค่าเองเมื่อ contacts, searchTerm, หรือ sortDirection เปลี่ยน
+  filteredContacts = computed(() => {
+    const term = this.searchTerm().toLowerCase();
+    const direction = this.sortDirection();
+    let contactsToShow = [...this.contacts()]; // สร้างสำเนาของ contacts array
+
+    // 1. กรองข้อมูล (Filter) ตาม searchTerm
+    if (term) {
+      contactsToShow = contactsToShow.filter(contact =>
+        contact.name.toLowerCase().includes(term) ||
+        contact.email.toLowerCase().includes(term)
+      );
+    }
+
+    // 2. จัดเรียง (Sort) ตาม direction
+    if (direction === 'asc') {
+      contactsToShow.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (direction === 'desc') {
+      contactsToShow.sort((a, b) => b.name.localeCompare(a.name));
+    }
+    // ถ้า direction เป็น 'none' ก็ไม่ต้องทำอะไร ใช้ลำดับเดิมจากการ filter
+
+    return contactsToShow;
+  });
 
   contactForm: FormGroup;
 
@@ -136,6 +241,16 @@ export class ContactPageComponent {
       email: ['', [Validators.required, Validators.email]],
       phone: ['', Validators.required],
     });
+  }
+
+  setSort(direction: 'asc' | 'desc' | 'none'): void {
+    this.sortDirection.set(direction);
+  }
+
+  // ++ เพิ่มเมธอดสำหรับล้างการค้นหา ++
+  clearSearch(): void {
+    this.searchTerm.set('');
+    // เราไม่จำเป็นต้องล้างค่าใน input เอง เพราะ [value]="searchTerm()" จะอัปเดต UI ให้เอง
   }
 
   onSubmit(): void {
@@ -162,21 +277,6 @@ export class ContactPageComponent {
     });
   }
 
-  // onSubmit(): void {
-  //   if (this.contactForm.invalid) return;
-  //   const user = this.contactService['authService'].currentUser();
-  //   if (!user) return;
-  //
-  //   const formData = this.contactForm.value;
-  //   const operation = this.isEditing() && this.selectedContact()
-  //     ? this.contactService.updateContact({...this.selectedContact()!, ...formData})
-  //     : this.contactService.addContact({...formData});
-  //
-  //   operation.then(() => {
-  //     this.closeModal();
-  //   }).catch(err => console.error('Error saving contact:', err));
-  // }
-
   onAddNew(): void {
     this.selectedContact.set(null);
     this.contactForm.reset();
@@ -201,13 +301,6 @@ export class ContactPageComponent {
         .catch(err => console.error(err));
     }
   }
-
-  // onDelete(id: string | undefined): void {
-  //   if (id && confirm('Are you sure you want to delete this contact?')) {
-  //     this.contactService.deleteContact(id)
-  //       .catch(err => console.error('Error deleting contact:', err));
-  //   }
-  // }
 
   closeModal(): void {
     this.isModalOpen.set(false);

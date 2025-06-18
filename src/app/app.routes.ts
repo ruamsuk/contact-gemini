@@ -22,6 +22,11 @@ export const routes: Routes = [
       .then(m => m.ContactPageComponent),
     canActivate: [authGuard] // ใช้ Guard ป้องกันหน้านี้
   },
+  {
+    path: 'profile',
+    loadComponent: () => import('./pages/profile').then(m => m.Profile),
+    canActivate: [authGuard]
+  },
 
   // ถ้าไม่เจอ path ไหนเลย ให้ไปที่ /contacts
   {path: '**', redirectTo: '/contacts'}

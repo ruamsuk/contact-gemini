@@ -4,6 +4,7 @@ import {
   Auth,
   authState,
   createUserWithEmailAndPassword,
+  deleteUser,
   signInWithEmailAndPassword,
   signOut
 } from '@angular/fire/auth';
@@ -24,6 +25,15 @@ export class AuthService {
 
   register(credentials: { email: string, pass: string }) {
     return createUserWithEmailAndPassword(this.auth, credentials.email, credentials.pass);
+  }
+
+  // ++ เพิ่มเมธอดสำหรับลบบัญชี ++
+  deleteAccount(): Promise<void> {
+    const user = this.currentUser();
+    if (!user) {
+      return Promise.reject(new Error('No user to delete.'));
+    }
+    return deleteUser(user);
   }
 
   logout() {
