@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { authState } from '@angular/fire/auth';
-import { addDoc, collection, collectionData, deleteDoc, doc, query, updateDoc, where } from '@angular/fire/firestore';
+import { addDoc, collection, collectionData, deleteDoc, doc, orderBy, query, updateDoc } from '@angular/fire/firestore';
 import { Observable, of, switchMap } from 'rxjs';
 import { db } from '../../../firebase.config';
 import { Contact } from '../models/contact.model';
@@ -31,8 +31,10 @@ export class ContactsService {
         // Filter contacts by user ID
         const contactQuery = query(
           this.contactsCollection,
-          where('userId', '==', user.uid)
+          orderBy('name', 'asc'),
         );
+        // return collectionData(this.contactsCollection, {idField: 'id'}) as Observable<Contact[]>;
+
         return collectionData(contactQuery, {idField: 'id'}) as Observable<Contact[]>;
       })
     );

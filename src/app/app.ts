@@ -4,10 +4,11 @@ import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { ToastContainer } from './component/toast-container.component';
 import { AuthService } from './services/auth.service';
 import { ConfirmDialogComponent } from './shared/components/confirm-dialog/confirm-dialog';
+import { Loading } from './shared/loading';
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule, RouterOutlet, ToastContainer, ConfirmDialogComponent, RouterLink],
+  imports: [CommonModule, RouterOutlet, ToastContainer, ConfirmDialogComponent, RouterLink, Loading],
   template: `
     <app-toast-container/>
     <header class="bg-white shadow-md">
@@ -20,7 +21,7 @@ import { ConfirmDialogComponent } from './shared/components/confirm-dialog/confi
           <div class="flex items-center gap-4">
             <a routerLink="/profile" class="text-sm text-gray-600 hover:text-blue-600 hover:underline"
                title="Go to profile">
-              Welcome, {{ authService.currentUser()?.email }}
+              Welcome, {{ authService.currentUser()?.displayName || authService.currentUser()?.email }}
             </a>
             <button (click)="logout()"
                     class="bg-red-500 text-white text-sm font-bold py-2 px-4 rounded-lg hover:bg-red-600 transition">
@@ -32,6 +33,7 @@ import { ConfirmDialogComponent } from './shared/components/confirm-dialog/confi
     </header>
     <router-outlet></router-outlet>
     <app-confirm-dialog/>
+    <app-loading/>
   `,
   styles: [],
 })

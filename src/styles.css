@@ -30,4 +30,16 @@ body {
 /* Add your custom styles here */
 button {
   cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.btn-disabled {
+  @apply py-2 px-3 bg-indigo-400 text-slate-300 rounded-lg opacity-45 cursor-not-allowed;
+}
+
+.loading-shade {
+  @apply fixed inset-0 bg-black/50 z-[9999999] flex items-center justify-center;
 }

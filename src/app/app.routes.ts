@@ -14,6 +14,10 @@ export const routes: Routes = [
     path: 'register',
     loadComponent: () => import('./auth/register').then(m => m.Register)
   },
+  {
+    path: 'forgot-password',
+    loadComponent: () => import('./auth/forgot-password').then(m => m.ForgotPassword)
+  },
 
   // หน้า Contacts (เฉพาะคนที่ล็อกอินแล้วถึงจะเข้าได้)
   {

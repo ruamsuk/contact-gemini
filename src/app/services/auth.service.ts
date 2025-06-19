@@ -5,8 +5,12 @@ import {
   authState,
   createUserWithEmailAndPassword,
   deleteUser,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  updateProfile,
+  UserCredential
 } from '@angular/fire/auth';
 
 @Injectable({
@@ -19,12 +23,34 @@ export class AuthService {
   private authState$ = authState(this.auth);
   public currentUser = toSignal(this.authState$);
 
-  login(credentials: { email: string, pass: string }) {
-    return signInWithEmailAndPassword(this.auth, credentials.email, credentials.pass);
+  async login(credentials: { email: string, pass: string }): Promise<UserCredential> {
+    return signInWithEmailAndPassword(this.auth, credentials.email, credentials.pass)
+      .then((userCredential: UserCredential) => {
+        // ++ ตรวจสอบสถานะการยืนยันอีเมล ++
+        if (!userCredential.user.emailVerified) {
+          // ถ้ายังไม่ยืนยัน, บังคับ logout และโยน error กลับไป
+          signOut(this.auth);
+          return Promise.reject({code: 'auth/email-not-verified'});
+        }
+        // ถ้าผ่าน, คืนค่า userCredential กลับไปตามปกติ
+        return userCredential;
+      });
   }
 
-  register(credentials: { email: string, pass: string }) {
-    return createUserWithEmailAndPassword(this.auth, credentials.email, credentials.pass);
+  async register(credentials: { email: string, pass: string, displayName: string }): Promise<void> {
+    let createdUser: UserCredential['user'];
+
+    const userCredential = await createUserWithEmailAndPassword(this.auth, credentials.email, credentials.pass);
+    createdUser = userCredential.user;
+    await updateProfile(createdUser, {
+      displayName: credentials.displayName
+    });
+    await sendEmailVerification(createdUser);
+    return await signOut(this.auth);
+  }
+
+  resetPassword(email: string): Promise<void> {
+    return sendPasswordResetEmail(this.auth, email);
   }
 
   // ++ เพิ่มเมธอดสำหรับลบบัญชี ++

@@ -4,6 +4,7 @@ import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } 
 import { catchError, Observable, tap, throwError } from 'rxjs';
 import { Contact } from '../models/contact.model';
 import { ContactsService } from '../services/contacts.service';
+import { LoadingService } from '../services/loading.service';
 import { ToastService } from '../services/toast.service';
 import { DialogService } from '../shared/services/dialog';
 
@@ -14,6 +15,9 @@ import { DialogService } from '../shared/services/dialog';
     FormsModule
   ],
   template: `
+    @if (loadingService.isLoading()) {
+
+    }
     <main class="container mx-auto p-4 md:p-8">
       <div class="flex justify-between items-center mb-10">
         <h1 class="text-3xl md:text-4xl font-bold text-gray-800">My Contacts</h1>
@@ -22,7 +26,8 @@ import { DialogService } from '../shared/services/dialog';
           + Add New
         </button>
       </div>
-      <!---->
+
+      <!-- Search and sort -->
       <div class="mb-6 p-4 bg-white rounded-xl shadow-md">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="md:col-span-2">
@@ -71,10 +76,10 @@ import { DialogService } from '../shared/services/dialog';
           </div>
         </div>
       </div>
-      <!---->
 
+      <!-- Contacts list -->
       <div class="space-y-4">
-        @for (contact of filteredContacts(); track contact.id) {
+        @for (contact of paginatedContacts(); track contact.id) {
           <div
             class="bg-white p-5 rounded-xl shadow-lg flex items-center justify-between transition-transform hover:scale-105">
             <div class="flex items-center gap-4">
@@ -113,8 +118,32 @@ import { DialogService } from '../shared/services/dialog';
           </div>
         }
       </div>
+
+      <!-- Paginator -->
+      @if (totalPages() > 1) {
+        <div class="mt-8 flex justify-center items-center gap-4">
+          <button
+            (click)="previousPage()"
+            [disabled]="currentPage() === 1"
+            class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+            Previous
+          </button>
+
+          <span class="text-sm text-gray-700">
+        Page {{ currentPage() }} of {{ totalPages() }}
+      </span>
+
+          <button
+            (click)="nextPage()"
+            [disabled]="currentPage() === totalPages()"
+            class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+            Next
+          </button>
+        </div>
+      }
     </main>
 
+    <!-- Modal -->
     @if (isModalOpen()) {
       <div (click)="closeModal()"
            class="fixed inset-0 bg-black/45 z-40 flex items-center justify-center transition-opacity duration-300">
@@ -167,17 +196,14 @@ import { DialogService } from '../shared/services/dialog';
       </div>
     }
   `,
-  styles: `.icons {
-    position: relative;
-    right: 30px;
-  }`
+  styles: ``
 })
 export class ContactPageComponent {
   private contactService = inject(ContactsService);
   private toastService = inject(ToastService);
   private dialogService = inject(DialogService);
   private fb = inject(FormBuilder);
-  loading = signal(false);
+  public loadingService = inject(LoadingService);
 
   /**
    *  ใช้ toSignal เพื่อแปลง Observable เป็น Signal
@@ -188,16 +214,22 @@ export class ContactPageComponent {
     (this.contactService.getContacts() as Observable<Contact[]>)
       .pipe(
         tap(() => {
-          this.loading.set(false);
+          this.loadingService.show();
           console.log('Contacts loaded');
         }),
         catchError(err => {
           this.toastService.show('Error loading contacts: ' + err.message, 'error');
           console.error('Error loading contacts:', err);
           return throwError(() => err);
+        }),
+        tap(() => {
+          this.loadingService.hide();
+          console.log('Contacts loading completed');
         })
       ),
-    {initialValue: []});
+    {
+      initialValue: []
+    });
 
   selectedContact: WritableSignal<Contact | null> = signal(null);
   isEditing: Signal<boolean> = computed(() => !!this.selectedContact());
@@ -207,30 +239,46 @@ export class ContactPageComponent {
   searchTerm = signal('');
   sortDirection = signal<'asc' | 'desc' | 'none'>('none');
 
-  // ++ Computed Signal พระเอกของงานนี้ ++
-  // สร้าง signal ใหม่ที่จะคำนวณค่าเองเมื่อ contacts, searchTerm, หรือ sortDirection เปลี่ยน
-  filteredContacts = computed(() => {
+  // ++ เพิ่ม Signals สำหรับ Pagination ++
+  currentPage = signal(1);
+  itemsPerPage = signal(5); // <-- กำหนดจำนวนรายการต่อหน้าตรงนี้
+
+  // vvv Refactor Computed Signal vvv
+  // 1. เปลี่ยนชื่อ computed เดิมเป็น sortedAndFilteredContacts
+  sortedAndFilteredContacts = computed(() => {
     const term = this.searchTerm().toLowerCase();
     const direction = this.sortDirection();
-    let contactsToShow = [...this.contacts()]; // สร้างสำเนาของ contacts array
+    let contactsToShow = [...this.contacts()];
 
-    // 1. กรองข้อมูล (Filter) ตาม searchTerm
     if (term) {
       contactsToShow = contactsToShow.filter(contact =>
         contact.name.toLowerCase().includes(term) ||
         contact.email.toLowerCase().includes(term)
       );
     }
-
-    // 2. จัดเรียง (Sort) ตาม direction
     if (direction === 'asc') {
       contactsToShow.sort((a, b) => a.name.localeCompare(b.name));
     } else if (direction === 'desc') {
       contactsToShow.sort((a, b) => b.name.localeCompare(a.name));
     }
-    // ถ้า direction เป็น 'none' ก็ไม่ต้องทำอะไร ใช้ลำดับเดิมจากการ filter
-
     return contactsToShow;
+  });
+
+  // 2. สร้าง computed ใหม่สำหรับแบ่งหน้าโดยเฉพาะ
+  paginatedContacts = computed(() => {
+    const fullList = this.sortedAndFilteredContacts();
+    const page = this.currentPage();
+    const perPage = this.itemsPerPage();
+
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+
+    return fullList.slice(startIndex, endIndex);
+  });
+
+  // 3. สร้าง computed สำหรับคำนวณจำนวนหน้าทั้งหมด
+  totalPages = computed(() => {
+    return Math.ceil(this.sortedAndFilteredContacts().length / this.itemsPerPage());
   });
 
   contactForm: FormGroup;
@@ -243,6 +291,21 @@ export class ContactPageComponent {
     });
   }
 
+  // ++ เพิ่มเมธอดสำหรับควบคุม Pagination ++
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages()) {
+      this.currentPage.set(page);
+    }
+  }
+
+  nextPage(): void {
+    this.goToPage(this.currentPage() + 1);
+  }
+
+  previousPage(): void {
+    this.goToPage(this.currentPage() - 1);
+  }
+
   setSort(direction: 'asc' | 'desc' | 'none'): void {
     this.sortDirection.set(direction);
   }
@@ -250,7 +313,6 @@ export class ContactPageComponent {
   // ++ เพิ่มเมธอดสำหรับล้างการค้นหา ++
   clearSearch(): void {
     this.searchTerm.set('');
-    // เราไม่จำเป็นต้องล้างค่าใน input เอง เพราะ [value]="searchTerm()" จะอัปเดต UI ให้เอง
   }
 
   onSubmit(): void {
@@ -297,8 +359,8 @@ export class ContactPageComponent {
 
     if (confirmed && contact.id) {
       this.contactService.deleteContact(contact.id)
-        .then(() => console.log('Contact deleted!'))
-        .catch(err => console.error(err));
+        .then(() => this.toastService.show('Contact deleted successfully!', 'success'))
+        .catch(err => this.toastService.show('Error deleting contact: ' + err.message, 'error'));
     }
   }
 
