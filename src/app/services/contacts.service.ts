@@ -1,6 +1,18 @@
 import { inject, Injectable } from '@angular/core';
 import { authState } from '@angular/fire/auth';
-import { addDoc, collection, collectionData, deleteDoc, doc, orderBy, query, updateDoc } from '@angular/fire/firestore';
+import {
+  addDoc,
+  collection,
+  collectionData,
+  deleteDoc,
+  doc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  updateDoc,
+  where
+} from '@angular/fire/firestore';
 import { Observable, of, switchMap } from 'rxjs';
 import { db } from '../../../firebase.config';
 import { Contact } from '../models/contact.model';
@@ -46,7 +58,7 @@ export class ContactsService {
    *  Adds a new contact to Firestore.
    * */
   addContact(contact: Omit<Contact, 'id' | 'userId'>) {
-    // console.log('%c[Service] 1. Received contact data from component:', 'color: blue; font-weight: bold;', contact);
+    // console.log('%c[Service] 1. Received contact data from a component:', 'color: blue; font-weight: bold;', contact);
 
     const user = this.authService.currentUser();
     // console.log('%c[Service] 2. Current user object:', 'color: blue; font-weight: bold;', user);
@@ -83,5 +95,38 @@ export class ContactsService {
     const contactDoc = doc(this.contactsCollection, contact.id);
     const {id, ...dataWithoutId} = contact; // Remove id if present
     return updateDoc(contactDoc, dataWithoutId);
+  }
+
+  /**
+   *  เพิ่มเมธอดสำหรับเช็คอีเมลซ้ำ ++
+   *  ตรวจสอบว่าอีเมลที่ส่งเข้ามามีอยู่ในฐานข้อมูลหรือไม่
+   *  ถ้ามี ให้ส่งกลับว่าอีเมลนั้นมีอยู่แล้ว พร้อมกับข้อมูลของ contact ที่มีอีเมลนั้น
+   *  ถ้าไม่มี ให้ส่งกลับว่าอีเมลนั้นไม่ซ้ำ
+   * */
+  // อันนี้เป็นแบบ Observable มีข้อเสียคือดึงข้อมูลทั้งหมดมา ถ้ามีมากก็ทำให้
+  // สิ้นเปลืองเวลาและทรัพยากร ---
+  // ดังนั้นจึงเปลี่ยนเป็นแบบ Promise แทน
+  // เอาไว้ใช้ดูเป็นตัวอย่าง
+  //
+  // checkEmailExists(email: string): Observable<boolean> {
+  // return this.getContacts().pipe(
+  //   switchMap(contacts => {
+  //     const exists = contacts.some(contact => contact.email === email);
+  //     return of(exists);
+  //   })
+  // );
+  //
+  async checkEmailExists(email: string): Promise<{ exists: boolean, existingContact?: Contact }> {
+    const q = query(this.contactsCollection, where('email', '==', email), limit(1));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      // เจอข้อมูลซ้ำ
+      const existingContact = {id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data()} as Contact;
+      return {exists: true, existingContact};
+    } else {
+      // ไม่เจอข้อมูลซ้ำ
+      return {exists: false};
+    }
   }
 }

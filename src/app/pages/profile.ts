@@ -34,6 +34,10 @@ import { DialogService } from '../shared/services/dialog';
               {{ authService.currentUser()?.emailVerified ? 'Yes' : 'No' }}
             </p>
           </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-500">Role</label>
+            <p class="text-lg text-green-500">{{ authService.currentUser()?.role }}</p>
+          </div>
         </div>
 
         <div class="mt-8 border-t-2 border-red-300 pt-6">

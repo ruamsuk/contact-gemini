@@ -215,7 +215,6 @@ export class ContactPageComponent {
       .pipe(
         tap(() => {
           this.loadingService.show();
-          console.log('Contacts loaded');
         }),
         catchError(err => {
           this.toastService.show('Error loading contacts: ' + err.message, 'error');
@@ -224,7 +223,6 @@ export class ContactPageComponent {
         }),
         tap(() => {
           this.loadingService.hide();
-          console.log('Contacts loading completed');
         })
       ),
     {
@@ -315,13 +313,33 @@ export class ContactPageComponent {
     this.searchTerm.set('');
   }
 
-  onSubmit(): void {
+  async onSubmit(): Promise<void> {
     if (this.contactForm.invalid) return;
 
     // เราไม่จำเป็นต้องดึง user ที่นี่ เพราะ Service จะเป็นคนจัดการเอง
     const formData = this.contactForm.value;
-
     // console.log(formData);
+    // --- ตรวจสอบข้อมูลซ้ำ ---
+    const check = await this.contactService.checkEmailExists(formData.email);
+    if (check.exists && check.existingContact?.id !== this.selectedContact()?.id) {
+      // ถ้าเจอข้อมูลซ้ำ และไม่ใช่เอกสารตัวเดียวกับที่กำลังแก้ไขอยู่
+      const confirmed = await this.dialogService.open({
+        title: 'Duplicate Contact Found',
+        message: `A contact with email <strong>${formData.email}</strong> already exists for <strong>${check.existingContact?.name}</strong>. Do you want to overwrite the existing contact?`
+      });
+
+      if (confirmed) {
+        // ผู้ใช้เลือก "Overwrite"
+        const contactToUpdate = {...check.existingContact, ...formData};
+        await this.contactService.updateContact(contactToUpdate);
+        this.closeModal();
+        return; // จบการทำงาน
+      } else {
+        // ผู้ใช้เลือก "Cancel"
+        return; // จบการทำงาน
+      }
+    }
+
 
     const operation = this.isEditing() && this.selectedContact()
       ? this.contactService.updateContact({...this.selectedContact()!, ...formData})
