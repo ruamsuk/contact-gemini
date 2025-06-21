@@ -8,7 +8,6 @@ import {
   doc,
   getDocs,
   limit,
-  orderBy,
   query,
   updateDoc,
   where
@@ -33,21 +32,27 @@ export class ContactsService {
   getContacts(): Observable<Contact[]> {
     return authState(this.authService['auth']).pipe(
       switchMap(user => {
-        if (!user) {
+        if (!user || !user.emailVerified) {
           return of([]); // Return an empty array if no user is authenticated,
           // return new Observable<Contact[]>(subscriber => {
           //   subscriber.next([]);
           //   subscriber.complete();
           // });
         }
-        // Filter contacts by user ID
-        const contactQuery = query(
-          this.contactsCollection,
-          orderBy('name', 'asc'),
-        );
-        // return collectionData(this.contactsCollection, {idField: 'id'}) as Observable<Contact[]>;
+        const appUser = this.authService.currentUser();
+        let contactsQuery;
 
-        return collectionData(contactQuery, {idField: 'id'}) as Observable<Contact[]>;
+        if (appUser && appUser.role === 'admin') {
+          // Admin จะสร้าง Query ที่ขอดูทั้งหมด -> กฎ allow list: if true; จะอนุญาต
+          contactsQuery = query(this.contactsCollection);
+        } else {
+          // User ทั่วไป จะสร้าง Query ที่มี where userId == 'ไอดีตัวเอง'
+          // -> กฎ allow list: if true; จะอนุญาตให้ส่งคำถามนี้ไปได้
+          contactsQuery = query(this.contactsCollection, where('userId', '==', user.uid));
+        }
+        return collectionData(this.contactsCollection, {idField: 'id'}) as Observable<Contact[]>;
+
+        //    return collectionData(contactsQuery, {idField: 'id'}) as Observable<Contact[]>;
       })
     );
     // Alternatively, if you want to return all contacts without filtering by user ID:

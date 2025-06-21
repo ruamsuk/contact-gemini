@@ -15,9 +15,6 @@ import { DialogService } from '../shared/services/dialog';
     FormsModule
   ],
   template: `
-    @if (loadingService.isLoading()) {
-
-    }
     <main class="container mx-auto p-4 md:p-8">
       <div class="flex justify-between items-center mb-10">
         <h1 class="text-3xl md:text-4xl font-bold text-gray-800">My Contacts</h1>
@@ -76,17 +73,28 @@ import { DialogService } from '../shared/services/dialog';
           </div>
         </div>
       </div>
-
+      <div class="mt-6">
+        @if (loadingService.isLoading()) {
+          <div class="flex justify-center items-center p-8">
+            <div class="w-12 h-12 border-4 border-dashed rounded-full animate-spin border-blue-600"></div>
+            <span class="ml-4 text-gray-600 dark:text-gray-400">Loading Contacts...</span>
+          </div>
+        }
+      </div>
+      <!-- End of Search and sort -->
       <!-- Contacts list -->
       <div class="space-y-4">
         @for (contact of paginatedContacts(); track contact.id) {
           <div
             class="bg-white p-5 rounded-xl shadow-lg flex items-center justify-between transition-transform hover:scale-105">
             <div class="flex items-center gap-4">
-              <div
+              <img class="h-12 w-12 rounded-full object-cover"
+                   [src]="'https://i.pravatar.cc/150?u=' + contact.id"
+                   alt="Contact Avatar">
+              <!--<div
                 class="bg-blue-100 text-blue-600 font-bold rounded-full h-12 w-12 flex items-center justify-center text-xl">
                 {{ contact.name.charAt(0).toUpperCase() }}
-              </div>
+              </div>-->
               <div>
                 <p class="font-semibold text-lg text-gray-800">{{ contact.name }}</p>
                 <p class="text-gray-500">{{ contact.email }}</p>
@@ -340,7 +348,7 @@ export class ContactPageComponent {
       }
     }
 
-
+    // Original Add/Update Logic
     const operation = this.isEditing() && this.selectedContact()
       ? this.contactService.updateContact({...this.selectedContact()!, ...formData})
       // ตรวจสอบว่าการเรียกใช้ addContact เป็นแบบนี้
