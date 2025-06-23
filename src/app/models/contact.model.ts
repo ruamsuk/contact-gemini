@@ -4,4 +4,5 @@ export interface Contact {
   userId: string;
   name: string;
   phone: string;
+  photoURL?: string; // Optional, can be null
 }

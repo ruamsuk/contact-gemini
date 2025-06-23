@@ -59,16 +59,40 @@ import { DialogService } from '../shared/services/dialog';
             <div>
               <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Role</label>
               <p class="text-lg font-semibold"
-                 [ngClass]="authService.currentUser()?.role === 'admin' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-800 dark:text-gray-200'">
+                 [ngClass]="authService.currentUser()?.emailVerified
+                ? ['text-purple-600', 'dark:text-purple-400']
+                : ['text-gray-800', 'dark:text-gray-200']">
                 {{ authService.currentUser()?.role | titlecase }}
               </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-500 dark:text-gray-400">Email Verified</label>
-              <p class="text-lg"
-                 [ngClass]="authService.currentUser()?.emailVerified ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-500'">
+
+              @if (authService.currentUser()?.emailVerified) {
+                <div class="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6">
+                    <path fill-rule="evenodd"
+                          d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.06 0l4.00-5.5Z"
+                          clip-rule="evenodd"/>
+                  </svg>
+                  <span class="font-semibold">Verified</span>
+                </div>
+              } @else {
+                <div class="flex items-center gap-2 text-red-600 dark:text-red-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-6 h-6">
+                    <path fill-rule="evenodd"
+                          d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z"
+                          clip-rule="evenodd"/>
+                  </svg>
+                  <span class="font-semibold">Not Verified</span>
+                </div>
+              }
+              <!--<p class="text-lg"
+                 [ngClass]="authService.currentUser()?.emailVerified
+              ? ['text-green-600', 'dark:text-green-400']
+              : ['text-red-600', 'dark:text-red-500']">
                 {{ authService.currentUser()?.emailVerified ? 'Yes' : 'No' }}
-              </p>
+              </p>-->
             </div>
           </div>
 
