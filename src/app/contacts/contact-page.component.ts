@@ -1,5 +1,6 @@
 import { Component, computed, inject, Signal, signal, WritableSignal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { collection, doc } from '@angular/fire/firestore';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { catchError, Observable, tap, throwError } from 'rxjs';
 import { Contact } from '../models/contact.model';
@@ -147,8 +148,66 @@ import { DialogService } from '../shared/services/dialog';
         }
       </div>
     </main>
-
+    <!-- New Modal for upload images -->
     @if (isModalOpen()) {
+      <div (click)="closeModal()" class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center">
+        <div (click)="$event.stopPropagation()"
+             class="bg-white p-8 rounded-xl shadow-2xl z-50 w-full max-w-md mx-4 dark:bg-gray-800">
+          <div class="flex justify-between items-center mb-6">
+            @if (isEditing()) {
+              <h2 class="text-2xl font-semibold text-gray-700 dark:text-gray-200">Edit Contact</h2>
+            } @else {
+              <h2 class="text-2xl font-semibold text-gray-700 dark:text-gray-200">Add New Contact</h2>
+            }
+            <button (click)="closeModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                   stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <form [formGroup]="contactForm" (ngSubmit)="onSubmit()">
+
+            <div class="flex flex-col items-center mb-6">
+              <img class="h-24 w-24 rounded-full object-cover ring-4 ring-blue-200"
+                   [src]="imagePreviewUrl() || 'https://i.pravatar.cc/150?u=new_contact'"
+                   alt="Contact Picture Preview">
+              <label for="contact-image-upload"
+                     class="mt-4 px-4 py-2 bg-gray-100 text-gray-800 text-sm font-semibold rounded-lg hover:bg-gray-200 cursor-pointer dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">
+                Select Picture
+              </label>
+              <input id="contact-image-upload" type="file" class="hidden" (change)="onContactImageSelected($event)"
+                     accept="image/png, image/jpeg">
+            </div>
+            <div class="mb-4">
+              <label for="name" class="block text-gray-600 font-medium mb-2 dark:text-gray-300">Name</label>
+              <input type="text" id="name" formControlName="name" class="w-full ...">
+            </div>
+            <div class="mb-4">
+              <label for="email" class="block text-gray-600 font-medium mb-2 dark:text-gray-300">Email</label>
+              <input type="email" id="email" formControlName="email" class="w-full ...">
+            </div>
+            <div class="mb-6">
+              <label for="phone" class="block text-gray-600 font-medium mb-2 dark:text-gray-300">Phone</label>
+              <input type="tel" id="phone" formControlName="phone" class="w-full ...">
+            </div>
+            <div class="flex items-center justify-end gap-4 mt-8">
+              <button type="button" (click)="closeModal()" class="bg-gray-200 ...">Cancel</button>
+              <button type="submit" [disabled]="contactForm.invalid" class="bg-blue-600 ...">
+                @if (isEditing()) {
+                  <span>Update</span>
+                } @else {
+                  <span>Save</span>
+                }
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    }
+    <!-- End new modal template -->
+
+    <!--@if (isModalOpen()) {
       <div (click)="closeModal()" class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center">
         <div (click)="$event.stopPropagation()"
              class="bg-white p-8 rounded-xl shadow-2xl z-50 w-full max-w-md mx-4 dark:bg-gray-800">
@@ -198,7 +257,7 @@ import { DialogService } from '../shared/services/dialog';
           </form>
         </div>
       </div>
-    }
+    }-->
     <!-- End new template -->
 
     <!--  <main class="container mx-auto p-4 md:p-8">
@@ -440,6 +499,22 @@ export class ContactPageComponent {
   currentPage = signal(1);
   itemsPerPage = signal(5); // <-- กำหนดจำนวนรายการต่อหน้าตรงนี้
 
+  // ++ Signals ใหม่สำหรับจัดการไฟล์ใน Modal ++
+  selectedFile = signal<File | null>(null);
+  imagePreviewUrl = signal<string | null>(null);
+
+
+  // ++ เมธอดใหม่เมื่อมีการเลือกไฟล์ ++
+  onContactImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) {
+      this.selectedFile.set(file);
+      // สร้าง URL ชั่วคราวสำหรับแสดงภาพตัวอย่างทันที
+      this.imagePreviewUrl.set(URL.createObjectURL(file));
+    }
+  }
+
   // vvv Refactor Computed Signal vvv
   // 1. เปลี่ยนชื่อ computed เดิมเป็น sortedAndFilteredContacts
   sortedAndFilteredContacts = computed(() => {
@@ -515,57 +590,100 @@ export class ContactPageComponent {
 
   async onSubmit(): Promise<void> {
     if (this.contactForm.invalid) return;
+    this.loadingService.show();
 
-    // เราไม่จำเป็นต้องดึง user ที่นี่ เพราะ Service จะเป็นคนจัดการเอง
-    const formData = this.contactForm.value;
-    // console.log(formData);
-    // --- ตรวจสอบข้อมูลซ้ำ ---
-    const check = await this.contactService.checkEmailExists(formData.email);
-    if (check.exists && check.existingContact?.id !== this.selectedContact()?.id) {
-      // ถ้าเจอข้อมูลซ้ำ และไม่ใช่เอกสารตัวเดียวกับที่กำลังแก้ไขอยู่
-      const confirmed = await this.dialogService.open({
-        title: 'Duplicate Contact Found',
-        message: `A contact with email <strong>${formData.email}</strong> already exists for <strong>${check.existingContact?.name}</strong>. Do you want to overwrite the existing contact?`
-      });
+    let contactData = {...this.contactForm.value};
 
-      if (confirmed) {
-        // ผู้ใช้เลือก "Overwrite"
-        const contactToUpdate = {...check.existingContact, ...formData};
-        await this.contactService.updateContact(contactToUpdate);
-        this.closeModal();
-        return; // จบการทำงาน
-      } else {
-        // ผู้ใช้เลือก "Cancel"
-        return; // จบการทำงาน
+    try {
+      // --- 1. ตรวจสอบและอัปโหลดรูปภาพก่อน ---
+      const fileToUpload = this.selectedFile();
+      if (fileToUpload) {
+        // หา ID ของ contact ที่จะใช้อ้างอิง
+        // ถ้าเป็นการสร้างใหม่, ให้สร้าง ID ขึ้นมาก่อน
+        const contactId = this.selectedContact()?.id || doc(collection(this.contactService['firestore'], '_')).id;
+
+        contactData.photoURL = await this.contactService.uploadContactImage(fileToUpload, contactId); // เพิ่ม URL ของรูปภาพเข้าไปในข้อมูลที่จะบันทึก
       }
-    }
 
-    // Original Add/Update Logic
-    const operation = this.isEditing() && this.selectedContact()
-      ? this.contactService.updateContact({...this.selectedContact()!, ...formData})
-      // ตรวจสอบว่าการเรียกใช้ addContact เป็นแบบนี้
-      // คือส่งไปแค่ข้อมูลจากฟอร์ม
-      : this.contactService.addContact(formData);
+      // --- 2. จัดการข้อมูลซ้ำ (ถ้าต้องการ) ---
+      // (โค้ดส่วนเช็คข้อมูลซ้ำยังคงทำงานได้ แต่เราอาจจะต้องปรับ Logic เล็กน้อยถ้าจะรวมกับการอัปโหลดรูป)
+      // ...
 
-    operation.then(() => {
-      this.toastService.show('Contact saved successfully!', 'success');
+      // --- 3. บันทึกข้อมูลลง Firestore ---
+      if (this.isEditing() && this.selectedContact()) {
+        const updatedContact = {...this.selectedContact()!, ...contactData};
+        await this.contactService.updateContact(updatedContact);
+      } else {
+        await this.contactService.addContact(contactData);
+      }
+
       this.closeModal();
-    }).catch(err => {
-      // Error จะแสดงที่นี่
-      this.toastService.show('Error saving contact' + err.message, 'error');
-      console.error('Error saving contact:', err);
-    });
+
+    } catch (error) {
+      console.error('Error during save process:', error);
+      // this.toastService.show('Failed to save contact.', 'error');
+    } finally {
+      this.loadingService.hide();
+    }
   }
+
+  /* async onSubmit(): Promise<void> {
+     if (this.contactForm.invalid) return;
+
+     // เราไม่จำเป็นต้องดึง user ที่นี่ เพราะ Service จะเป็นคนจัดการเอง
+     const formData = this.contactForm.value;
+     // console.log(formData);
+     // --- ตรวจสอบข้อมูลซ้ำ ---
+     const check = await this.contactService.checkEmailExists(formData.email);
+     if (check.exists && check.existingContact?.id !== this.selectedContact()?.id) {
+       // ถ้าเจอข้อมูลซ้ำ และไม่ใช่เอกสารตัวเดียวกับที่กำลังแก้ไขอยู่
+       const confirmed = await this.dialogService.open({
+         title: 'Duplicate Contact Found',
+         message: `A contact with email <strong>${formData.email}</strong> already exists for <strong>${check.existingContact?.name}</strong>. Do you want to overwrite the existing contact?`
+       });
+
+       if (confirmed) {
+         // ผู้ใช้เลือก "Overwrite"
+         const contactToUpdate = {...check.existingContact, ...formData};
+         await this.contactService.updateContact(contactToUpdate);
+         this.closeModal();
+         return; // จบการทำงาน
+       } else {
+         // ผู้ใช้เลือก "Cancel"
+         return; // จบการทำงาน
+       }
+     }
+
+     // Original Add/Update Logic
+     const operation = this.isEditing() && this.selectedContact()
+       ? this.contactService.updateContact({...this.selectedContact()!, ...formData})
+       // ตรวจสอบว่าการเรียกใช้ addContact เป็นแบบนี้
+       // คือส่งไปแค่ข้อมูลจากฟอร์ม
+       : this.contactService.addContact(formData);
+
+     operation.then(() => {
+       this.toastService.show('Contact saved successfully!', 'success');
+       this.closeModal();
+     }).catch(err => {
+       // Error จะแสดงที่นี่
+       this.toastService.show('Error saving contact' + err.message, 'error');
+       console.error('Error saving contact:', err);
+     });
+   }*/
 
   onAddNew(): void {
     this.selectedContact.set(null);
     this.contactForm.reset();
+    this.selectedFile.set(null); // รีเซ็ตไฟล์ที่เลือก
+    this.imagePreviewUrl.set(null); // รีเซ็ตภาพตัวอย่าง
     this.isModalOpen.set(true);
   }
 
   onEdit(contact: Contact): void {
     this.selectedContact.set(contact);
     this.contactForm.patchValue(contact);
+    this.selectedFile.set(null);
+    this.imagePreviewUrl.set(contact.photoURL || null); // แสดงภาพเดิม
     this.isModalOpen.set(true);
   }
 

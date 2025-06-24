@@ -13,9 +13,9 @@ import { ToastService } from '../services/toast.service';
     NgClass
   ],
   template: `
-    <div class="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
-        <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">Login</h2>
+    <div class="min-h-screen bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+      <div class="bg-white dark:bg-gray-900  p-8 rounded-xl shadow-lg w-full max-w-md">
+        <h2 class="text-3xl font-bold text-center text-gray-800 dark:text-gray-200 mb-8">Login</h2>
 
         @if (successMessage) {
           <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
@@ -25,14 +25,14 @@ import { ToastService } from '../services/toast.service';
 
         <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
           <div class="mb-4">
-            <label for="email" class="block text-gray-600 font-medium mb-2">Email</label>
+            <label for="email" class="block text-gray-600 dark:text-gray-400 font-medium mb-2">Email</label>
             <input type="email" id="email" formControlName="email"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                   class="w-full px-4 py-2 border border-gray-300 dark:border-gray-400 dark:text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:bg-gray-950">
           </div>
           <div class="mb-6">
-            <label for="password" class="block text-gray-600 font-medium mb-2">Password</label>
+            <label for="password" class="block text-gray-600 dark:text-gray-400 font-medium mb-2">Password</label>
             <input type="password" id="password" formControlName="password"
-                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                   class="w-full px-4 py-2 border border-gray-300 dark:border-gray-400 dark:text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:bg-gray-950">
           </div>
 
           <div class="text-right mb-6">

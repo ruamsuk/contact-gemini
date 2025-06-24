@@ -43,3 +43,15 @@ button {
 .loading-shade {
   @apply fixed inset-0 bg-black/50 z-[9999999] flex items-center justify-center;
 }
+
+/* === Autofill Style Override for Dark Mode === */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  /* ใช้ค่าสี Hex Code โดยตรง (สีเทา-700 ของ Tailwind) */
+  -webkit-box-shadow: 0 0 0 30px #374151 inset !important;
+
+  /* ใช้ค่าสี Hex Code โดยตรง (สีขาว) */
+  -webkit-text-fill-color: #ffffff !important;
+}

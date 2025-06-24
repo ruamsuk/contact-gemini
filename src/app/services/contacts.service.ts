@@ -6,12 +6,14 @@ import {
   collectionData,
   deleteDoc,
   doc,
+  Firestore,
   getDocs,
   limit,
   query,
   updateDoc,
   where
 } from '@angular/fire/firestore';
+import { getDownloadURL, ref, Storage, uploadBytes } from '@angular/fire/storage';
 import { Observable, of, switchMap } from 'rxjs';
 import { db } from '../../../firebase.config';
 import { Contact } from '../models/contact.model';
@@ -22,6 +24,8 @@ import { AuthService } from './auth.service';
 })
 export class ContactsService {
   private authService = inject(AuthService);
+  private firestore: Firestore = inject(Firestore);
+  private storage: Storage = inject(Storage); // ใช้ Storage from @angular/fire/storage
   private contactsCollection = collection(db, 'contacts');
 
   /**
@@ -57,6 +61,23 @@ export class ContactsService {
     );
     // Alternatively, if you want to return all contacts without filtering by user ID:
     // return collectionData(this.contactsCollection, {idField: 'id'}) as Observable<Contact[]>;
+  }
+
+  /**
+   *  Uploads a contact image to Firebase Storage.
+   *  @param file The image file to upload.
+   *  @param contactId The ID of the contact to associate the image with.
+   * */
+  async uploadContactImage(file: File, contactId: string): Promise<string> {
+    // สร้าง Path ที่จะเก็บไฟล์ เช่น /contact_images/CONTACT_ID/avatar.jpg
+    const filePath = `contact_images/${contactId}/${file.name}`;
+    /** ระวัง ref ต้อง import from @angular/fire/storage พร้อมกับ Storage
+     *  ไม่เช่นนั้น WebStorm จะเข้าใจผิดว่าเป็น ref จาก @angular/fire/firestore
+     * */
+    const storageRef = ref(this.storage, filePath);
+
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
   }
 
   /**
